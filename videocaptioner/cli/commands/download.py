@@ -1,6 +1,7 @@
 """download command — download online video via yt-dlp."""
 
 import shutil
+import subprocess
 from argparse import Namespace
 from pathlib import Path
 
@@ -12,6 +13,7 @@ def run(args: Namespace, config: dict) -> int:
     url = args.url
     out_dir = getattr(args, "output", None) or "."
     quiet = getattr(args, "quiet", False)
+    fmt = getattr(args, "format", None) or "bestvideo+bestaudio/best"
 
     if not shutil.which("yt-dlp"):
         output.error("yt-dlp not found on PATH")
@@ -23,16 +25,18 @@ def run(args: Namespace, config: dict) -> int:
     progress = None if quiet else output.ProgressLine(f"Downloading {url}").start()
 
     try:
-        import subprocess
         cmd = [
             "yt-dlp",
-            "-f", "bestvideo+bestaudio/best",
+            "-f", fmt,
             "-o", f"{out_dir}/%(title)s.%(ext)s",
             "--no-playlist",
-            url,
         ]
+        cookies_from_browser = getattr(args, "cookies_from_browser", None)
+        if cookies_from_browser:
+            cmd.extend(["--cookies-from-browser", cookies_from_browser])
         if quiet:
             cmd.append("--quiet")
+        cmd.append(url)
 
         result = subprocess.run(cmd, capture_output=quiet, text=True)
 

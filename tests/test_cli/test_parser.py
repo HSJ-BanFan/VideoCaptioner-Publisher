@@ -101,6 +101,16 @@ class TestSynthesizeParser:
         assert main(["synthesize", "/no/video.mp4", "-s", "/no/sub.srt"]) == EXIT.FILE_NOT_FOUND
 
 
+class TestDownloadParser:
+    def test_download_help_includes_cookies_from_browser(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            main(["download", "--help"])
+        assert exc.value.code == 0
+        out = capsys.readouterr().out
+        assert "--cookies-from-browser" in out
+        assert "--format" in out
+
+
 class TestConfigParser:
     def test_no_action(self):
         assert main(["config"]) == EXIT.USAGE_ERROR
