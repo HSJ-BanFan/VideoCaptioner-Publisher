@@ -31,6 +31,12 @@ videocaptioner synthesize video.mp4 -s subtitle.srt
 
 # 下载在线视频
 videocaptioner download "https://youtube.com/watch?v=xxx"
+
+# YouTube 需要浏览器登录态时，从 Firefox 读取 cookies
+videocaptioner download "https://youtube.com/watch?v=xxx" --cookies-from-browser firefox
+
+# 某些最佳画质格式返回 403 时，指定可下载格式
+videocaptioner download "https://youtube.com/watch?v=xxx" --cookies-from-browser firefox -f "18/best[height<=360]"
 ```
 
 需要 LLM 功能（字幕优化、大模型翻译）时，配置 API Key：

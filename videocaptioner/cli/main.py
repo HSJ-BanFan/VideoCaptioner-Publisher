@@ -427,6 +427,8 @@ def _build_download_parser(subparsers) -> None:
     p.add_argument("url", help="Video URL")
     _add_common_options(p)
     p.add_argument("-o", "--output", metavar="DIR", help="Output directory (default: current directory)")
+    p.add_argument("-f", "--format", metavar="FORMAT", help="yt-dlp format selector (default: bestvideo+bestaudio/best)")
+    p.add_argument("--cookies-from-browser", metavar="BROWSER", help="Pass browser cookies to yt-dlp (e.g. firefox, chrome, edge)")
     p.set_defaults(func=_run_download)
 
 

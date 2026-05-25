@@ -12,6 +12,8 @@ def run(args: Namespace, config: dict) -> int:
     url = args.url
     out_dir = getattr(args, "output", None) or "."
     quiet = getattr(args, "quiet", False)
+    download_format = getattr(args, "format", None) or "bestvideo+bestaudio/best"
+    cookies_from_browser = getattr(args, "cookies_from_browser", None)
 
     try:
         import yt_dlp
@@ -26,12 +28,15 @@ def run(args: Namespace, config: dict) -> int:
 
     try:
         ydl_opts: dict[str, Any] = {
-            "format": "bestvideo+bestaudio/best",
+            "format": download_format,
             "outtmpl": f"{out_dir}/%(title)s.%(ext)s",
             "noplaylist": True,
             "quiet": quiet,
             "no_warnings": quiet,
         }
+        if cookies_from_browser:
+            ydl_opts["cookiesfrombrowser"] = (cookies_from_browser, None, None, None)
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[arg-type]
             ydl.download([url])
 
