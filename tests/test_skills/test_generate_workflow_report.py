@@ -40,6 +40,7 @@ def test_generate_translate_report_writes_summary_and_metadata(tmp_path: Path) -
         ),
         clips=(),
         degradations=("used firefox cookies",),
+        media=None,
     )
 
     script.write_report(report, output_dir)
@@ -92,6 +93,7 @@ def test_generate_clip_report_includes_clips(tmp_path: Path) -> None:
             ),
         ),
         degradations=(),
+        media=None,
     )
 
     script.write_report(report, output_dir)
@@ -109,3 +111,95 @@ def test_generate_clip_report_includes_clips(tmp_path: Path) -> None:
     ]
     assert "## 剪辑片段" in summary
     assert "00:00:00.000 - 00:01:30.000" in summary
+
+
+def test_build_metadata_includes_media_when_present() -> None:
+    script = load_script()
+    media = script.MediaMetadata(
+        path="video/subtitled.mp4",
+        size_bytes=123456,
+        duration=1841.67,
+        video_codec="h264",
+        resolution="1280x720",
+        frame_rate="30000/1001",
+        audio_codec="opus",
+        sample_rate="48000",
+    )
+    report = script.WorkflowReport(
+        url="https://youtube.com/watch?v=abc123",
+        video_id="abc123",
+        title="Demo Video",
+        duration=123.45,
+        workflow="translate",
+        subtitle_source=script.SubtitleSource(language="en", kind="manual", format="vtt"),
+        llm=script.LlmConfig(translator="llm", target_language="zh-Hans", reflect=True, layout="target-above"),
+        outputs=("video/subtitled.mp4",),
+        clips=(),
+        degradations=(),
+        media=media,
+    )
+
+    metadata = script.build_metadata(report)
+
+    assert metadata["media"] == {
+        "path": "video/subtitled.mp4",
+        "size_bytes": 123456,
+        "duration": 1841.67,
+        "video_codec": "h264",
+        "resolution": "1280x720",
+        "frame_rate": "30000/1001",
+        "audio_codec": "opus",
+        "sample_rate": "48000",
+    }
+
+
+def test_probe_media_returns_metadata(tmp_path: Path, monkeypatch) -> None:
+    script = load_script()
+    video = tmp_path / "subtitled.mp4"
+    video.write_bytes(b"fake video")
+
+    ffprobe_output = {
+        "format": {"duration": "1841.67"},
+        "streams": [
+            {"codec_type": "video", "codec_name": "h264", "width": 1280, "height": 720, "avg_frame_rate": "30000/1001"},
+            {"codec_type": "audio", "codec_name": "opus", "sample_rate": "48000"},
+        ],
+    }
+
+    class Result:
+        returncode = 0
+        stdout = json.dumps(ffprobe_output)
+        stderr = ""
+
+    monkeypatch.setattr(script.subprocess, "run", lambda *_args, **_kwargs: Result())
+
+    media = script.probe_media(video)
+
+    assert media == script.MediaMetadata(
+        path=str(video),
+        size_bytes=len(b"fake video"),
+        duration=1841.67,
+        video_codec="h264",
+        resolution="1280x720",
+        frame_rate="30000/1001",
+        audio_codec="opus",
+        sample_rate="48000",
+    )
+
+
+def test_probe_media_failure_becomes_degradation(tmp_path: Path, monkeypatch) -> None:
+    script = load_script()
+    video = tmp_path / "subtitled.mp4"
+    video.write_bytes(b"fake video")
+
+    class Result:
+        returncode = 1
+        stdout = ""
+        stderr = "ffprobe failed"
+
+    monkeypatch.setattr(script.subprocess, "run", lambda *_args, **_kwargs: Result())
+
+    media, degradations = script.resolve_media(video, ())
+
+    assert media is None
+    assert degradations == ("media probe failed: ffprobe failed",)

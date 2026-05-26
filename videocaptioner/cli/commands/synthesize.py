@@ -152,6 +152,12 @@ def _override_ass_font(ass_style: str, font_file: Optional[str], font_size: Opti
     return "\n".join(result)
 
 
+def _is_hwaccel_failure(error: Exception) -> bool:
+    """Check whether *error* is related to hardware-accelerated encoding."""
+    text = str(error).lower()
+    return any(token in text for token in ("cuda", "hwaccel", "hardware"))
+
+
 def run(args: Namespace, config: dict) -> int:
     video_path = Path(args.video)
     subtitle_path = Path(args.subtitle)
@@ -175,6 +181,9 @@ def run(args: Namespace, config: dict) -> int:
     quality = get(config, "synthesize.quality", "medium")
     quiet = getattr(args, "quiet", False)
     verbose = getattr(args, "verbose", False)
+    use_hwaccel = not getattr(args, "no_hwaccel", False) and not get(
+        config, "synthesize.no_hwaccel", False
+    )
 
     crf, preset = _QUALITY_MAP.get(quality, (28, "medium"))
     soft = subtitle_mode == "soft"
@@ -198,6 +207,11 @@ def run(args: Namespace, config: dict) -> int:
     if Path(output_path).resolve() == video_path.resolve():
         output.error("Output path is the same as input video. Use -o to specify a different output.")
         return EXIT.USAGE_ERROR
+
+    # Create output parent directory if needed
+    output_parent = Path(output_path).parent
+    if str(output_parent) not in (".", ""):
+        output_parent.mkdir(parents=True, exist_ok=True)
 
     if verbose:
         output.info(f"Mode: {'soft (embedded track)' if soft else 'hard (burned in)'}")
@@ -261,16 +275,28 @@ def run(args: Namespace, config: dict) -> int:
                 if font_file:
                     _register_font(font_file)
 
-                render_ass_video(
-                    video_path=str(video_path),
-                    asr_data=asr_data,
-                    output_path=output_path,
-                    style_str=ass_style,
-                    layout=layout,
-                    crf=crf,
-                    preset=preset,
-                    progress_callback=progress_callback,
-                )
+                render_kwargs = {
+                    "video_path": str(video_path),
+                    "asr_data": asr_data,
+                    "output_path": output_path,
+                    "style_str": ass_style,
+                    "layout": layout,
+                    "crf": crf,
+                    "preset": preset,
+                    "progress_callback": progress_callback,
+                    "use_hwaccel": use_hwaccel,
+                }
+
+                try:
+                    render_ass_video(**render_kwargs)
+                except Exception as e:
+                    if use_hwaccel and _is_hwaccel_failure(e):
+                        if verbose:
+                            output.warn("Hardware acceleration failed; retrying on CPU")
+                        render_kwargs["use_hwaccel"] = False
+                        render_ass_video(**render_kwargs)
+                    else:
+                        raise
 
         if progress:
             progress.finish(f"Done -> {output_path}")

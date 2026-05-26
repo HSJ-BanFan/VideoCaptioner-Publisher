@@ -115,15 +115,23 @@ class TestSynthesizeParser:
     def test_file_not_found(self):
         assert main(["synthesize", "/no/video.mp4", "-s", "/no/sub.srt"]) == EXIT.FILE_NOT_FOUND
 
+    def test_synthesize_help_includes_no_hwaccel(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            main(["synthesize", "--help"])
+        assert exc.value.code == 0
+        out = capsys.readouterr().out
+        assert "--no-hwaccel" in out
+
 
 class TestDownloadParser:
-    def test_download_help_includes_cookies_from_browser(self, capsys):
+    def test_download_help_includes_download_options(self, capsys):
         with pytest.raises(SystemExit) as exc:
             main(["download", "--help"])
         assert exc.value.code == 0
         out = capsys.readouterr().out
         assert "--cookies-from-browser" in out
         assert "--format" in out
+        assert "--proxy" in out
 
 
 class TestProcessParser:
