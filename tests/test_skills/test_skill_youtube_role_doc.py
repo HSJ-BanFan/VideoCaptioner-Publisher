@@ -59,7 +59,7 @@ def test_output_contract_is_documented() -> None:
         "optimized_source.srt",
         "clip.mp4",
         "subtitled.mp4",
-        "--subtitle-mode none",
+        "skip synthesize entirely",
     ]
     for item in expected_items:
         assert item in content
@@ -80,3 +80,17 @@ def test_llm_missing_config_guidance_is_documented() -> None:
     ]
     for item in expected_items:
         assert item in content
+
+
+def test_skill_documents_youtube_recovery_and_windows_guidance() -> None:
+    text = read_skill()
+    assert "PowerShell" in text
+    assert "$env:HTTP_PROXY" in text
+    assert "--cookies-from-browser firefox" in text
+    assert "pip install -U yt-dlp" in text
+    assert "HTTP Error 429" in text or "429" in text
+    assert "Sign in to confirm" in text or "bot" in text.lower()
+    assert "--no-hwaccel" in text
+    assert "target-above" in text
+    assert "--reflect" in text
+    assert ".claude/skills/videocaptioner/" in text

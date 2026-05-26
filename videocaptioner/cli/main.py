@@ -244,6 +244,11 @@ def _build_synthesize_parser(subparsers) -> None:
              "  low:    CRF 32, fast preset — smallest file",
     )
     opt.add_argument(
+        "--no-hwaccel",
+        action="store_true",
+        help="Disable hardware acceleration and render on CPU",
+    )
+    opt.add_argument(
         "--layout",
         choices=["target-above", "source-above", "target-only", "source-only"],
         help="Subtitle layout for bilingual output (default: target-above)",
@@ -429,6 +434,7 @@ def _build_download_parser(subparsers) -> None:
     p.add_argument("-o", "--output", metavar="DIR", help="Output directory (default: current directory)")
     p.add_argument("-f", "--format", metavar="FORMAT", help="yt-dlp format selector (default: bestvideo+bestaudio/best)")
     p.add_argument("--cookies-from-browser", metavar="BROWSER", help="Pass browser cookies to yt-dlp (e.g. firefox, chrome, edge)")
+    p.add_argument("--proxy", metavar="URL", help="Proxy URL passed to yt-dlp, e.g. http://127.0.0.1:7897")
     p.set_defaults(func=_run_download)
 
 
@@ -589,6 +595,8 @@ def _build_cli_overrides(args: argparse.Namespace) -> dict:
     _set("synthesize.style", getattr(args, "style", None))
     _set("synthesize.style_override", getattr(args, "style_override", None))
     _set("synthesize.font_file", getattr(args, "font_file", None))
+    if getattr(args, "no_hwaccel", False):
+        _set("synthesize.no_hwaccel", True)
 
     # Dubbing
     _set("dubbing.preset", getattr(args, "dub_preset", None))

@@ -54,6 +54,7 @@ Clipping triggers:
 - FFmpeg required for clipping and video synthesis (`brew install ffmpeg` on macOS)
 - **Free (no API key):** transcription (bijian/jianying), translation (Bing/Google)
 - **Requires LLM API key:** subtitle optimization, subtitle re-segmentation, LLM translation. Set via `OPENAI_API_KEY` env var or `--api-key` flag
+- Repo `skills/` directory is source of truth. Sync to `.claude/skills/videocaptioner/` only after implementation and tests pass so installed skill stays consistent.
 - Skill helper scripts live in `skills/scripts/` in this repository. When installed to Claude Code, copy the whole `skills/` directory so all scripts remain available.
 
 ---
@@ -112,6 +113,18 @@ $env:HTTPS_PROXY="http://127.0.0.1:7897"
 $env:ALL_PROXY="http://127.0.0.1:7897"
 videocaptioner download "VIDEO_URL" --cookies-from-browser firefox
 ```
+
+If download quality or availability looks suspicious, use these recovery commands and checks:
+
+```powershell
+python -m pip install -U yt-dlp
+videocaptioner download "VIDEO_URL" --cookies-from-browser firefox --proxy http://127.0.0.1:7897
+videocaptioner download "VIDEO_URL" --cookies-from-browser firefox --proxy http://127.0.0.1:7897 -f "18/best[height<=360]"
+```
+
+- `HTTP Error 429` means current exit IP may be rate-limited by YouTube. Switch proxy node or retry later.
+- `Sign in to confirm you're not a bot` means retry with browser cookies and switch proxy node or network exit.
+- If video download keeps failing but subtitle tracks are still available, subtitle-only path can continue first and video synthesis can happen later.
 
 For local video, use the provided file path. Then inspect media details:
 
@@ -181,7 +194,7 @@ full VTT
 Download full VTT captions first when available:
 
 ```bash
-yt-dlp --cookies-from-browser <browser> --write-auto-subs --sub-langs "en-orig,en" --sub-format "vtt" --skip-download "VIDEO_URL"
+yt-dlp --cookies-from-browser <browser> --write-subs --write-auto-subs --sub-langs "en-orig,en" --sub-format "vtt" --skip-download "VIDEO_URL"
 ```
 
 Then run VideoCaptioner's high-quality subtitle pipeline on the full subtitle file:
@@ -307,11 +320,13 @@ For each clip, burn the bilingual subtitle track into the video by default:
 videocaptioner synthesize clips/Main_Idea/clip.mp4 -s clips/Main_Idea/clip_bilingual.srt --subtitle-mode hard --quality high -o clips/Main_Idea/subtitled.mp4
 ```
 
-If the user prefers to keep the original clip without burned subtitles (e.g., for storage optimization or separate subtitle delivery), use `--subtitle-mode none`:
+If ASS rendering hits GPU or CUDA issues, retry on CPU:
 
-```bash
-videocaptioner synthesize clips/Main_Idea/clip.mp4 -s clips/Main_Idea/clip_bilingual.srt --subtitle-mode none -o clips/Main_Idea/clip.mp4
+```powershell
+videocaptioner synthesize video/source.mp4 -s subtitles/bilingual.srt --subtitle-mode hard --quality high --no-hwaccel -o video/subtitled.mp4
 ```
+
+If the user prefers to keep the original clip without burned subtitles (e.g., for storage optimization or separate subtitle delivery), skip synthesize entirely and deliver `clip.mp4` plus external subtitle files.
 
 For styled output, use `videocaptioner style` and `--style` / `--render-mode` / `--style-override` as needed.
 
@@ -336,9 +351,9 @@ Show the complete file tree per clip:
 ```text
 Output directory: clips/Main_Idea/
 ├── clip.mp4              — Original clip (lossless cut)
-├── clip.srt              — Subtitle segment (timestamps reset)
-├── clip_bilingual.srt    — Bilingual subtitles (if translated)
-├── clip_final.mp4        — Hard-subtitled clip (if burned)
+├── clip_bilingual.srt    — Bilingual subtitles (timestamps reset)
+├── clip_zh.srt           — Target-language subtitle segment
+├── subtitled.mp4         — Hard-subtitled clip (if burned)
 └── summary.md            — Social media summary (if generated)
 ```
 
